@@ -31,7 +31,7 @@ export function LoginPage() {
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "An error occurred during login. Please try again.",

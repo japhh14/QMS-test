@@ -30,7 +30,7 @@ export function DeleteConfirmation({ isOpen, onClose, onConfirm, recordName }: D
             <div>
               <DialogTitle>Delete FMEA Record</DialogTitle>
               <DialogDescription className="mt-1">
-                Are you sure you want to delete "{recordName}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{recordName}&quot;? This action cannot be undone.
               </DialogDescription>
             </div>
           </div>
