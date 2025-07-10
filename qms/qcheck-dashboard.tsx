@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -8,96 +8,139 @@ import { useToast } from "@/lib/use-toast"
 import { Edit, Trash2, Download, Plus } from "lucide-react"
 import { FMEAForm } from "./components/fmea-form"
 import { DeleteConfirmation } from "./components/delete-confirmation"
-
-interface FMEARecord {
-  id: number
-  processName: string
-  date: string
-  potentialFailure: number
-  description?: string
-}
-
-// Initial sample data
-const initialFmeaRecords: FMEARecord[] = [
-  {
-    id: 1,
-    processName: "Assembly Line A",
-    date: "2025-06-23",
-    potentialFailure: 45,
-    description: "Risk of component misalignment during assembly process",
-  },
-  {
-    id: 2,
-    processName: "Quality Control Station",
-    date: "2025-06-22",
-    potentialFailure: 32,
-    description: "Potential for defective parts to pass inspection",
-  },
-  {
-    id: 3,
-    processName: "Packaging Process",
-    date: "2025-06-21",
-    potentialFailure: 18,
-    description: "Risk of packaging damage during automated sealing",
-  },
-  {
-    id: 4,
-    processName: "Material Handling",
-    date: "2025-06-20",
-    potentialFailure: 67,
-    description: "High risk of material contamination during transport",
-  },
-]
+import { useAuth } from "./components/auth-context"
+import { fmeaDB, type FMEARecord } from "./lib/database"
 
 export default function QcheckDashboard() {
-  const [fmeaRecords, setFmeaRecords] = useState<FMEARecord[]>(initialFmeaRecords)
+  const { user } = useAuth()
+  const [fmeaRecords, setFmeaRecords] = useState<FMEARecord[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<FMEARecord | null>(null)
   const [deleteRecord, setDeleteRecord] = useState<FMEARecord | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
+  useEffect(() => {
+    if (user) {
+      loadFMEARecords()
+    }
+  }, [user])
+
+  const loadFMEARecords = async () => {
+    if (user) {
+      setIsLoading(true)
+      try {
+        const records = await fmeaDB.findByUserId(user.id)
+        setFmeaRecords(records)
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load FMEA records",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+
   // Create new FMEA record
-  const handleCreateRecord = (newRecord: Omit<FMEARecord, "id">) => {
-    const id = Math.max(...fmeaRecords.map((r) => r.id), 0) + 1
-    const record: FMEARecord = { ...newRecord, id }
-    setFmeaRecords([...fmeaRecords, record])
-    toast({
-      title: "Success",
-      description: "FMEA record created successfully",
-    })
+  const handleCreateRecord = async (
+    newRecord: Omit<FMEARecord, "id" | "rpn" | "createdAt" | "updatedAt" | "userId">,
+  ) => {
+    if (!user) return
+
+    try {
+      await fmeaDB.create({ ...newRecord, userId: user.id })
+      await loadFMEARecords()
+      toast({
+        title: "Success",
+        description: "FMEA record created successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create FMEA record",
+        variant: "destructive",
+      })
+    }
   }
 
   // Edit existing FMEA record
-  const handleEditRecord = (updatedRecord: Omit<FMEARecord, "id">) => {
+  const handleEditRecord = async (
+    updatedRecord: Omit<FMEARecord, "id" | "rpn" | "createdAt" | "updatedAt" | "userId">,
+  ) => {
     if (!editingRecord) return
 
-    const updatedRecords = fmeaRecords.map((record) =>
-      record.id === editingRecord.id ? { ...updatedRecord, id: editingRecord.id } : record,
-    )
-    setFmeaRecords(updatedRecords)
-    setEditingRecord(null)
-    toast({
-      title: "Success",
-      description: "FMEA record updated successfully",
-    })
+    try {
+      await fmeaDB.update(editingRecord.id, updatedRecord)
+      await loadFMEARecords()
+      setEditingRecord(null)
+      toast({
+        title: "Success",
+        description: "FMEA record updated successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update FMEA record",
+        variant: "destructive",
+      })
+    }
   }
 
   // Delete FMEA record
-  const handleDeleteRecord = (id: number) => {
-    setFmeaRecords(fmeaRecords.filter((record) => record.id !== id))
-    toast({
-      title: "Success",
-      description: "FMEA record deleted successfully",
-    })
+  const handleDeleteRecord = async (id: string) => {
+    try {
+      await fmeaDB.delete(id)
+      await loadFMEARecords()
+      toast({
+        title: "Success",
+        description: "FMEA record deleted successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete FMEA record",
+        variant: "destructive",
+      })
+    }
   }
 
   // Export FMEA records to CSV
   const handleExportRecords = () => {
-    const headers = ["Process Name", "Date", "Potential Failure", "Description"]
+    if (fmeaRecords.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No FMEA records to export",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const headers = [
+      "Process Name",
+      "Date",
+      "Potential Failure",
+      "Severity",
+      "Occurrence",
+      "Detection",
+      "RPN",
+      "Description",
+    ]
     const csvContent = [
       headers.join(","),
       ...fmeaRecords.map((record) =>
-        [`"${record.processName}"`, record.date, record.potentialFailure, `"${record.description || ""}"`].join(","),
+        [
+          `"${record.processName}"`,
+          record.date,
+          `"${record.potentialFailure}"`,
+          record.severity,
+          record.occurrence,
+          record.detection,
+          record.rpn,
+          `"${record.description || ""}"`,
+        ].join(","),
       ),
     ].join("\n")
 
@@ -119,10 +162,28 @@ export default function QcheckDashboard() {
 
   // Export single record
   const handleExportSingleRecord = (record: FMEARecord) => {
-    const headers = ["Process Name", "Date", "Potential Failure", "Description"]
+    const headers = [
+      "Process Name",
+      "Date",
+      "Potential Failure",
+      "Severity",
+      "Occurrence",
+      "Detection",
+      "RPN",
+      "Description",
+    ]
     const csvContent = [
       headers.join(","),
-      [`"${record.processName}"`, record.date, record.potentialFailure, `"${record.description || ""}"`].join(","),
+      [
+        `"${record.processName}"`,
+        record.date,
+        `"${record.potentialFailure}"`,
+        record.severity,
+        record.occurrence,
+        record.detection,
+        record.rpn,
+        `"${record.description || ""}"`,
+      ].join(","),
     ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
@@ -149,13 +210,20 @@ export default function QcheckDashboard() {
     })
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading FMEA records...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Remove the header section completely */}
-
-      {/* Main Content - keep as is */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Saved FMEA Records Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Saved FMEA Records</h2>
@@ -183,13 +251,17 @@ export default function QcheckDashboard() {
                     <TableHead className="font-semibold text-gray-700 py-4 px-6">Process Name</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-6">Date</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-6">Potential Failure</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">Severity</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">Occurrence</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">Detection</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-6">RPN</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {fmeaRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-gray-500">
+                      <TableCell colSpan={8} className="py-8 text-center text-gray-500">
                         No FMEA records found. Create your first record to get started.
                       </TableCell>
                     </TableRow>
@@ -201,17 +273,23 @@ export default function QcheckDashboard() {
                       >
                         <TableCell className="py-4 px-6 font-medium text-gray-900">{record.processName}</TableCell>
                         <TableCell className="py-4 px-6 text-gray-600">{formatDate(record.date)}</TableCell>
+                        <TableCell className="py-4 px-6 text-gray-600">{record.potentialFailure}</TableCell>
+                        <TableCell className="py-4 px-6 text-center">{record.severity}</TableCell>
+                        <TableCell className="py-4 px-6 text-center">{record.occurrence}</TableCell>
+                        <TableCell className="py-4 px-6 text-center">{record.detection}</TableCell>
                         <TableCell className="py-4 px-6">
                           <span
-                            className={`font-medium ${
-                              record.potentialFailure >= 70
-                                ? "text-red-600"
-                                : record.potentialFailure >= 40
-                                  ? "text-yellow-600"
-                                  : "text-green-600"
+                            className={`font-medium px-2 py-1 rounded-full text-xs ${
+                              record.rpn >= 200
+                                ? "bg-red-100 text-red-800"
+                                : record.rpn >= 100
+                                  ? "bg-orange-100 text-orange-800"
+                                  : record.rpn >= 50
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-green-100 text-green-800"
                             }`}
                           >
-                            {record.potentialFailure}
+                            {record.rpn}
                           </span>
                         </TableCell>
                         <TableCell className="py-4 px-6">

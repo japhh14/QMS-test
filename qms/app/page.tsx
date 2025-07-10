@@ -7,35 +7,22 @@ import { Navigation } from "../components/navigation"
 import { HomeDashboard } from "../components/home-dashboard"
 import { SettingsPage } from "../components/settings-page"
 import QcheckDashboard from "../qcheck-dashboard"
-
-// Sample FMEA data for the home dashboard
-const sampleFmeaRecords = [
-  {
-    id: 1,
-    processName: "Assembly Line A",
-    date: "2025-06-23",
-    potentialFailure: 45,
-    description: "Risk of component misalignment during assembly process",
-  },
-  {
-    id: 2,
-    processName: "Quality Control Station",
-    date: "2025-06-22",
-    potentialFailure: 32,
-    description: "Potential for defective parts to pass inspection",
-  },
-  {
-    id: 3,
-    processName: "Material Handling",
-    date: "2025-06-20",
-    potentialFailure: 67,
-    description: "High risk of material contamination during transport",
-  },
-]
+import { Toaster } from "../components/ui/toaster"
 
 function AppContent() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const [currentPage, setCurrentPage] = useState("dashboard")
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <LoginPage />
@@ -44,13 +31,13 @@ function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
-        return <HomeDashboard fmeaRecords={sampleFmeaRecords} />
+        return <HomeDashboard onNavigate={setCurrentPage} />
       case "history":
         return <QcheckDashboard />
       case "settings":
         return <SettingsPage />
       default:
-        return <HomeDashboard fmeaRecords={sampleFmeaRecords} />
+        return <HomeDashboard onNavigate={setCurrentPage} />
     }
   }
 
@@ -66,6 +53,7 @@ export default function Page() {
   return (
     <AuthProvider>
       <AppContent />
+      <Toaster />
     </AuthProvider>
   )
 }

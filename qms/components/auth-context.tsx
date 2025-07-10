@@ -1,45 +1,70 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  role: string
-}
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { userDB, type User } from "@/lib/database"
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
+  register: (name: string, email: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Listen to authentication state changes
+    const unsubscribe = userDB.onAuthStateChanged((user) => {
+      setUser(user)
+      setIsLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Simple demo authentication
-    if (email === "admin@fmea.com" && password === "admin123") {
-      setUser({
-        id: "1",
-        name: "admin",
-        email: "admin@fmea.com",
-        role: "Administrator",
-      })
-      return true
+    try {
+      const authenticatedUser = await userDB.authenticate(email, password)
+      if (authenticatedUser) {
+        setUser(authenticatedUser)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Login error:", error)
+      return false
     }
-    return false
   }
 
-  const logout = () => {
-    setUser(null)
+  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+    try {
+      const newUser = await userDB.create({
+        name,
+        email,
+        password,
+        role: "User",
+      })
+      setUser(newUser)
+      return true
+    } catch (error) {
+      console.error("Registration error:", error)
+      return false
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await userDB.signOut()
+      setUser(null)
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
   }
 
   return (
@@ -47,8 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         login,
+        register,
         logout,
         isAuthenticated: !!user,
+        isLoading,
       }}
     >
       {children}
