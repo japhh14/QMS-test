@@ -25,22 +25,16 @@ export function LoginPage() {
 
     try {
       const success = await login(loginData.email, loginData.password)
-      if (!success) {
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password. Please try again.",
-          variant: "destructive",
-        })
-      } else {
+      if (success) {
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
         })
       }
-    } catch {
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "An error occurred during login. Please try again.",
+        title: "Login Failed",
+        description: error.message || "Invalid email or password. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -60,6 +54,15 @@ export function LoginPage() {
       return
     }
 
+    if (registerData.password.length < 6) {
+      toast({
+        title: "Weak Password",
+        description: "Password should be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -69,17 +72,11 @@ export function LoginPage() {
           title: "Account Created!",
           description: "Your account has been created successfully.",
         })
-      } else {
-        toast({
-          title: "Registration Failed",
-          description: "User with this email already exists.",
-          variant: "destructive",
-        })
       }
-    } catch {
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "An error occurred during registration. Please try again.",
+        title: "Registration Failed",
+        description: error.message || "Failed to create account. Please try again.",
         variant: "destructive",
       })
     } finally {

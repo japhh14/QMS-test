@@ -19,13 +19,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === "undefined") {
+      setIsLoading(false)
+      return
+    }
+
     // Listen to authentication state changes
     const unsubscribe = userDB.onAuthStateChanged((user) => {
       setUser(user)
       setIsLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe()
+      }
+    }
   }, [])
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -36,9 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true
       }
       return false
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error)
-      return false
+      // Re-throw the error so the component can show the specific message
+      throw error
     }
   }
 
@@ -52,9 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       setUser(newUser)
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error)
-      return false
+      // Re-throw the error so the component can show the specific message
+      throw error
     }
   }
 

@@ -10,7 +10,6 @@ import {
   getDoc,
   query,
   where,
-  orderBy,
   serverTimestamp,
 } from "firebase/firestore"
 import {
@@ -20,19 +19,9 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser,
 } from "firebase/auth"
-
-// Try this import if your firebase.ts exports a default object
 import firebase from "./firebase"
-const db = firebase.db
-const auth = firebase.auth
 
-// OR try this if your firebase.ts exports named exports differently
-// import { firestore as db, authentication as auth } from "./firebase"
-
-// OR try this if you need to import everything
-// import * as firebase from "./firebase"
-// const db = firebase.db
-// const auth = firebase.auth
+const { db, auth } = firebase
 
 export interface User {
   id: string
@@ -83,7 +72,8 @@ export const userDB = {
         createdAt: serverTimestamp(),
       }
 
-      await addDoc(collection(db, "users"), userDoc)
+      const docRef = await addDoc(collection(db, "users"), userDoc)
+      console.log("User document created with ID:", docRef.id)
 
       return {
         id: firebaseUser.uid,
@@ -93,7 +83,15 @@ export const userDB = {
         createdAt: new Date().toISOString(),
       }
     } catch (error: any) {
-      throw new Error(error.message || "Failed to create user")
+      console.error("User creation error:", error)
+      if (error.code === "auth/email-already-in-use") {
+        throw new Error("An account with this email already exists")
+      } else if (error.code === "auth/weak-password") {
+        throw new Error("Password should be at least 6 characters")
+      } else if (error.code === "auth/invalid-email") {
+        throw new Error("Invalid email address")
+      }
+      throw new Error(error.message || "Failed to create user account")
     }
   },
 
@@ -150,9 +148,40 @@ export const userDB = {
 
       // Get user data from Firestore
       const user = await this.findById(firebaseUser.uid)
+
+      // If user document doesn't exist in Firestore, create it
+      if (!user) {
+        const newUserDoc = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || "User",
+          email: firebaseUser.email || email,
+          role: "User",
+          createdAt: serverTimestamp(),
+        }
+
+        await addDoc(collection(db, "users"), newUserDoc)
+
+        return {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || "User",
+          email: firebaseUser.email || email,
+          role: "User",
+          createdAt: new Date().toISOString(),
+        }
+      }
+
       return user
-    } catch (error) {
+    } catch (error: any) {
       console.error("Authentication error:", error)
+      if (error.code === "auth/user-not-found") {
+        throw new Error("No account found with this email")
+      } else if (error.code === "auth/wrong-password") {
+        throw new Error("Incorrect password")
+      } else if (error.code === "auth/invalid-email") {
+        throw new Error("Invalid email address")
+      } else if (error.code === "auth/too-many-requests") {
+        throw new Error("Too many failed attempts. Please try again later")
+      }
       return null
     }
   },
@@ -168,14 +197,30 @@ export const userDB = {
 
   // Listen to auth state changes
   onAuthStateChanged(callback: (user: User | null) => void) {
-    return onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
-        const user = await this.findById(firebaseUser.uid)
-        callback(user)
-      } else {
-        callback(null)
-      }
-    })
+    if (typeof window === "undefined") {
+      callback(null)
+      return () => {}
+    }
+
+    try {
+      return onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+          try {
+            const user = await this.findById(firebaseUser.uid)
+            callback(user)
+          } catch (error) {
+            console.error("Error getting user data:", error)
+            callback(null)
+          }
+        } else {
+          callback(null)
+        }
+      })
+    } catch (error) {
+      console.error("Error setting up auth listener:", error)
+      callback(null)
+      return () => {}
+    }
   },
 }
 
@@ -320,11 +365,12 @@ export const fmeaDB = {
 
   async findByUserId(userId: string): Promise<FMEARecord[]> {
     try {
-      const q = query(collection(db, "fmea_records"), where("userId", "==", userId), orderBy("updatedAt", "desc"))
+      // Temporary fix: Query without ordering to avoid index requirement
+      const q = query(collection(db, "fmea_records"), where("userId", "==", userId))
 
       const querySnapshot = await getDocs(q)
 
-      return querySnapshot.docs.map((doc) => {
+      const records = querySnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
           id: doc.id,
@@ -341,6 +387,9 @@ export const fmeaDB = {
           updatedAt: timestampToString(data.updatedAt),
         }
       })
+
+      // Sort in JavaScript instead of Firestore
+      return records.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     } catch (error) {
       console.error("Error finding FMEA records by user ID:", error)
       return []
@@ -349,10 +398,11 @@ export const fmeaDB = {
 
   async getAll(): Promise<FMEARecord[]> {
     try {
-      const q = query(collection(db, "fmea_records"), orderBy("updatedAt", "desc"))
+      // Temporary fix: Query without ordering to avoid index requirement
+      const q = query(collection(db, "fmea_records"))
       const querySnapshot = await getDocs(q)
 
-      return querySnapshot.docs.map((doc) => {
+      const records = querySnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
           id: doc.id,
@@ -369,6 +419,9 @@ export const fmeaDB = {
           updatedAt: timestampToString(data.updatedAt),
         }
       })
+
+      // Sort in JavaScript instead of Firestore
+      return records.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     } catch (error) {
       console.error("Error getting all FMEA records:", error)
       return []
