@@ -1,4 +1,4 @@
-#This is the best
+// #This is the best
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
