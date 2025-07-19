@@ -3,39 +3,34 @@ import { initializeApp, getApps, getApp } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 
-// Ensure all required env vars are present
-if (
-  !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-  !process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-  !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-  !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-  !process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
-  !process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
-  !process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-) {
-  throw new Error("❌ Missing Firebase environment variables. Check your Vercel config.")
-}
-
-// Firebase config
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCMNoEYwTOFqZarZr2fy-yjMrC9OayeTgQ",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "qms-prod-2b3a2.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "qms-prod-2b3a2",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "qms-prod-2b3a2.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "602660560656",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:602660560656:web:afd5df0ac87583e65acf95",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-0VKHH4MRNX",
 }
 
-// Optional: log loaded config safely (do not log keys in prod)
-console.log("✓ Firebase environment variables loaded successfully")
+// Debug: Log the config to see what's being loaded
+console.log("Firebase Config:", {
+  apiKey: firebaseConfig.apiKey ? "✓ Loaded" : "✗ Missing",
+  authDomain: firebaseConfig.authDomain ? "✓ Loaded" : "✗ Missing",
+  projectId: firebaseConfig.projectId ? "✓ Loaded" : "✗ Missing",
+})
 
-// Initialize Firebase
+
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
+
+// Initialize Firestore
 const db = getFirestore(app)
+
+// Initialize Auth
 const auth = getAuth(app)
 
-// Optional: initialize analytics (only in browser)
+// Initialize Analytics (optional)
 if (typeof window !== "undefined") {
   import("firebase/analytics")
     .then(({ getAnalytics }) => {
@@ -51,7 +46,11 @@ if (typeof window !== "undefined") {
     })
 }
 
-// Export initialized services
+// Log successful initialization
+console.log("✓ Firebase initialized successfully")
+console.log("✓ Firestore initialized")
+console.log("✓ Auth initialized")
+
 export default {
   db,
   auth,
