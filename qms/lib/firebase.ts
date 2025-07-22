@@ -3,24 +3,29 @@ import { initializeApp, getApps, getApp } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCMNoEYwTOFqZarZr2fy-yjMrC9OayeTgQ",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "qms-prod-2b3a2.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "qms-prod-2b3a2",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "qms-prod-2b3a2.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "602660560656",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:602660560656:web:afd5df0ac87583e65acf95",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-0VKHH4MRNX",
+// Helper to ensure all required env vars are present
+function getEnvVar(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+  return value
 }
 
-// Debug: Log the config to see what's being loaded
-console.log("Firebase Config:", {
-  apiKey: firebaseConfig.apiKey ? "✓ Loaded" : "✗ Missing",
-  authDomain: firebaseConfig.authDomain ? "✓ Loaded" : "✗ Missing",
-  projectId: firebaseConfig.projectId ? "✓ Loaded" : "✗ Missing",
-})
+const firebaseConfig = {
+  apiKey: getEnvVar("NEXT_PUBLIC_FIREBASE_API_KEY"),
+  authDomain: getEnvVar("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+  projectId: getEnvVar("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+  storageBucket: getEnvVar("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: getEnvVar("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: getEnvVar("NEXT_PUBLIC_FIREBASE_APP_ID"),
+  measurementId: getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"),
+}
 
-
+// Debug: Log the config to see what's being loaded (only in development)
+if (process.env.NODE_ENV === "development") {
+  console.log("Firebase Config Loaded:", Object.keys(firebaseConfig))
+}
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp()
 
@@ -30,7 +35,7 @@ const db = getFirestore(app)
 // Initialize Auth
 const auth = getAuth(app)
 
-// Initialize Analytics (optional)
+// Initialize Analytics (optional, only on client)
 if (typeof window !== "undefined") {
   import("firebase/analytics")
     .then(({ getAnalytics }) => {
@@ -46,10 +51,12 @@ if (typeof window !== "undefined") {
     })
 }
 
-// Log successful initialization
-console.log("✓ Firebase initialized successfully")
-console.log("✓ Firestore initialized")
-console.log("✓ Auth initialized")
+// Log successful initialization (only in development)
+if (process.env.NODE_ENV === "development") {
+  console.log("✓ Firebase initialized successfully")
+  console.log("✓ Firestore initialized")
+  console.log("✓ Auth initialized")
+}
 
 export default {
   db,
